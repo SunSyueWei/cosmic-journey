@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#060e20">
+  <title>宇宙的奧秘與人生的意義 · 星海旅人</title>
+  <link rel="stylesheet" href="styles.css?v=5">
+</head>
+<body>
+<main class="shell">
+  <header><a class="brand" href="./index.html"><span class="brand-icon">✧</span> THE COSMIC JOURNEY <small>台中青少年福音聚會</small></a><button id="sound" class="icon" aria-label="開啟聲音" aria-pressed="false">♫ <span>聲音關閉</span></button></header>
+  <section class="heading"><div><p class="eyebrow">YOU’RE INVITED · 一趟尋找意義的星際旅程</p><h1>宇宙的奧秘<span>與人生的意義</span></h1><p class="intro">宇宙浩瀚無邊，但你從不孤單。人生的意義，等你來發現。</p></div><button id="leaderboard" class="outline">✧ 排行榜 <span>↗</span></button></section>
+  <section class="game" aria-label="奔向福音聚會跑酷遊戲">
+    <div class="hud"><div><small>本局分數</small><strong id="score">00000</strong></div><div><small>奔跑距離</small><strong><span id="distance">0</span><em> m</em></strong></div><div><small>邀請卡</small><strong>✉ <span id="cards">0</span></strong></div><button id="pause" class="icon" aria-label="暫停遊戲" disabled>Ⅱ</button></div>
+    <canvas id="world" width="960" height="500" aria-label="小小太空人穿越星球；點擊遊戲區域或按空白鍵跳躍"></canvas>
+    <div class="sector"><span id="planet-en">MERCURY</span><b id="planet-name">水星 · 隕石荒原</b><small>航行速度 <strong id="velocity">1.00×</strong></small></div>
+    <div class="route"><span id="route-label">目的地：福音聚會</span><span id="remaining">還有 1,000 m</span><div class="track"><div id="progress"></div></div></div>
+    <div id="toast" role="status"></div>
+    <section id="start-panel" class="overlay"><div class="start-card"><span class="pill">渺小的我，也有被尋見的意義</span><h2>在無垠星海，<br>踏出你的一步。</h2><p>穿越九個星球，帶著邀請卡奔向福音聚會。<br>抵達之後，探索仍然繼續。</p><label for="nickname">旅人的暱稱 <small>最多 10 個字</small></label><input id="nickname" maxlength="20" placeholder="例如：星海旅人" autocomplete="off"><button id="start" class="primary">啟程，奔向星海 <span>→</span></button><p class="hint">手機點擊畫面 · 電腦按空白鍵</p></div></section>
+    <section id="pause-panel" class="overlay" hidden><div class="panel"><span class="pill">休息一下也很好</span><h2>等你，一起跑。</h2><p>準備好了再繼續，路程會為你保留。</p><button id="resume" class="primary">繼續奔跑 →</button><button class="outline restart">重新開始</button></div></section>
+    <section id="end-panel" class="overlay" hidden><div class="panel"><span class="pill" id="end-badge">每一步都算數</span><h2 id="end-title">跑得真不錯！</h2><strong id="final-score" class="big-score">0</strong><p id="result-detail"></p><div class="best">個人最佳 <b id="best-score">0</b></div><p id="rank-summary"></p><button class="primary restart">再跑一次 →</button><button id="end-ranking" class="outline">看看排行榜</button></div></section>
+  </section>
+  <section class="notes"><div><span>01</span><p><b>光門之後，加速探索</b><small>航行速度無上限 · 隨機障礙挑戰</small></p></div><div><span>02</span><p><b>每 1,000 m，一顆星球</b><small>抵達新星球，解鎖專屬收藏卡</small></p></div><div><span>03</span><p><b>把這一刻，留給朋友</b><small>解鎖專屬成就卡，可下載分享</small></p></div></section>
+  <button id="last-achievement" class="outline" hidden>✧ 我的星球收藏冊</button>
+  <footer><span>A SMALL TRAVELER. AN INFINITE UNIVERSE.</span><span>本機遊玩 · 九星球幻想旅程（含冥王星）</span></footer>
+</main>
+<dialog id="ranking"><div class="dialog-top"><p class="eyebrow">GOOD NEWS · GREAT RUNS</p><button id="close-ranking" class="icon" aria-label="關閉排行榜">×</button></div><h2>一起跑，更好玩。</h2><p>本機排行榜 · 示範選手已標記，尚未跨手機連線。</p><div class="tabs"><button data-tab="today" aria-pressed="true">今日排行</button><button data-tab="event" aria-pressed="false">本次活動排行</button></div><div id="rank-list"></div><p class="hint">每位選手顯示最佳成績 · 同分以較遠距離優先</p></dialog>
+<dialog id="achievement" aria-labelledby="achievement-title"><p class="eyebrow">COSMIC COLLECTION · 星海足跡</p><h2 id="achievement-title">九星旅人，正式加冕。</h2><p id="achievement-caption">你穿越了整片星海。這一刻，值得被記住。</p><nav id="card-album" aria-label="已解鎖的成就卡"></nav><canvas id="achievement-card" width="900" height="1100" role="img" aria-label="九星旅人成就卡：包含暱稱、分數、距離及九個星球"></canvas><p id="achievement-status" role="status">下載成就卡，或直接截圖分享給朋友。</p><div class="achievement-actions"><button id="save-achievement" class="primary">下載成就卡 PNG ↓</button><button id="continue-achievement" class="outline">繼續探索 →</button></div></dialog>
+<script src="js/config.js?v=5"></script><script src="js/storage.js?v=5"></script><script src="js/audio.js?v=5"></script><script src="js/space.js?v=5"></script><script src="js/achievement.js?v=5"></script><script src="js/obstacles.js?v=5"></script><script src="js/game.js?v=5"></script>
+</body>
+</html>

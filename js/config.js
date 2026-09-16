@@ -1,0 +1,2 @@
+/* Distances are metres; physics use logical canvas pixels and seconds. */
+window.RUN_CONFIG = Object.freeze({ gravity:1800, jumpVelocity:650, startSpeed:210, acceleration:1.8, afterAcceleration:7.2, metresPerPixel:.12, venueDistance:1000, planetDistance:1000, transitionDistance:28, cardPoints:100, arrivalBonus:2000, afterMultiplier:1.5, milestoneDistance:500, milestoneBonus:500, eventId:'good-news-2026', storageKey:'good-news-run-v1' });
