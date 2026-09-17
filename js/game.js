@@ -1,11 +1,12 @@
 (()=>{
  'use strict';
- const C=RUN_CONFIG,$=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext('2d');
+ const C=RUN_CONFIG,$=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext('2d',{alpha:false});
  let width=960,height=500,ground=400,state='ready',run,muted=false,tab='today',last=0,accumulator=0,toastTime=0;
  const player={x:95,y:0,vy:0,w:38,h:43,previousY:0};
- function resize(){const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;height=500;width=rect.width/rect.height*height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);ground=height-83;player.x=Math.min(130,width*.21);}
+ let quality=1.5,dirty=true,qualityTime=0,qualityFrames=0;
+ function resize(){const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;height=500;width=rect.width/rect.height*height;const dpr=Math.min(devicePixelRatio||1,quality,Math.sqrt(1500000/(rect.width*rect.height))),pw=Math.round(rect.width*dpr),ph=Math.round(rect.height*dpr);if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph;}ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);ground=height-83;player.x=Math.min(130,width*.21);dirty=true;}
  function reset(){run={distance:0,previousDistance:0,score:0,cards:0,cardsBefore:0,time:0,speed:C.startSpeed,arrived:false,nextCard:1,burstRemaining:0,milestone:0,obstacles:[],collectibles:[],particles:[],spawn:2.2,cardTimer:1.4,safe:0};player.y=0;player.previousY=0;player.vy=0;accumulator=0;toastTime=0;$('toast').textContent='';RunAudio.setSpeed(C.startSpeed);updateHUD();}
- function panels(name){['start','pause','end'].forEach(n=>$(n+'-panel').hidden=n!==name);}
+ function panels(name){['start','pause','end'].forEach(n=>$(n+'-panel').hidden=n!==name);dirty=true;}
  async function start(){
    if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
    if($('achievement').open)$('achievement').close();
@@ -122,7 +123,22 @@
    for(const p of run.particles){ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,7);}
  }
  let hudElapsed=0;
- function frame(now){const dt=Math.min((now-last)/1000||0,.05);last=now;if(state==='running'){accumulator+=dt;while(accumulator>=1/120&&state==='running'){step(1/120);accumulator-=1/120;}hudElapsed+=dt;if(hudElapsed>=.1){updateHUD();hudElapsed=0;}}draw();requestAnimationFrame(frame);}
+ function frame(now){
+  const dt=Math.max(0,(now-last)/1000||0);last=now;
+  if(state==='running'){
+   // Preserve short dropped frames in full. Long interruptions pause explicitly,
+   // rather than silently losing elapsed time or catching up into unseen obstacles.
+   if(dt>.25){pause();toast('偵測到畫面停頓，已暫停保護本局；按繼續即可。',3);}
+   else{
+    accumulator+=dt;while(accumulator+1e-10>=1/120&&state==='running'){step(1/120);accumulator=Math.max(0,accumulator-1/120);}
+    hudElapsed+=dt;if(hudElapsed>=.1){updateHUD();hudElapsed=0;}
+    // Lower raster resolution only, never physics, score, or sailing speed.
+    qualityTime+=dt;qualityFrames++;if(qualityTime>=2){if(qualityTime/qualityFrames>1/45&&quality>.75){quality=Math.max(.75,quality-.25);resize();}qualityTime=0;qualityFrames=0;}
+   }
+   dirty=true;
+  }
+  if(dirty){draw();dirty=false;}requestAnimationFrame(frame);
+ }
  async function showRanking(){pause();$('ranking').showModal();await renderRanking();}
  let rankingRequest=0;
  async function renderRanking(){
@@ -139,12 +155,10 @@
    $('sharing-help').hidden=!enabled;
    $('cloud-consent').checked=profile.cloudConsent;
    $('delete-cloud-scores').hidden=!enabled;
-   $('privacy-summary').textContent=enabled&&profile.cloudConsent?'已參加共用排行榜；公開暱稱、最高分與距離。':'目前分數與收藏卡只保存在這個瀏覽器。';
  }
- $('change-player-settings').onclick=()=>{if(state==='starting')return;pause();state='ready';panels('start');$('nickname').focus();};
  $('cloud-consent').addEventListener('change',()=>{
    const checked=$('cloud-consent').checked;RunStore.setProfile({cloudConsent:checked});
-   $('privacy-status').textContent=checked?'已加入共用排行榜；下一局開始時會上傳成績。':'已停止上傳新成績；既有雲端成績仍可按下方按鈕刪除。';
+   $('privacy-status').textContent=checked?'已加入共用排行榜；下一局開始時會上傳成績。':'已停止上傳新成績；既有雲端成績仍可在此刪除。';
    refreshPrivacy();
  });
  $('delete-cloud-scores').onclick=async()=>{

@@ -44,5 +44,25 @@ function boot(){
  assert.equal(modes.size,3);assert(Math.max(...delays)-Math.min(...delays)>1.5);
  // Same elapsed time at 30/60/90/120 Hz gives the same simulated distance.
  const distances=[];for(const fps of [30,60,90,120]){const fresh=boot();await fresh.t.start();fresh.t.run.safe=100;fresh.t.frame(0);for(let frame=1;frame<=fps*5;frame++)fresh.t.frame(frame*1000/fps);distances.push(fresh.t.run.distance);}assert(Math.max(...distances)-Math.min(...distances)<.5);
- console.log('PASS: gameplay, 1000 m planets, uncapped acceleration, 9000 m achievement, card export, persistent trophy, safe resume, continuous terrain and 30/60/90/120 Hz consistency.');
+ // Dropped frames up to 250 ms preserve the same simulation time as regular frames.
+ const regular=boot(),jitter=boot();await regular.t.start();await jitter.t.start();regular.t.run.safe=jitter.t.run.safe=100;
+ for(let i=1;i<=120;i++)regular.t.frame(i*1000/120);
+ for(const ms of [100,200,400,500,700,800,1000])jitter.t.frame(ms);
+ assert(Math.abs(regular.t.run.distance-jitter.t.run.distance)<1e-8,'jitter must not discard elapsed time');
+ const pausedDistance=jitter.t.run.distance;jitter.t.frame(1500);assert.equal(jitter.t.state,'paused');assert.equal(jitter.t.run.distance,pausedDistance);
+ jitter.t.resume();assert.equal(jitter.t.state,'running');
+ // Cached samples match original geometry, including negative chunk boundaries.
+ for(const planet of box.SpaceScene.planets)for(const layer of [0,1])for(const i of [-129,-128,-1,0,127,128,300]){
+  const point=box.SpaceScene.terrainPoints(i*16,16,planet.type,layer).find(p=>p[0]===0);
+  assert.equal(box.SpaceScene.sampleTerrain(i,planet.type,layer),point[1]);
+ }
+ for(let i=0;i<10000;i+=128)box.SpaceScene.sampleTerrain(i,'ice',0);
+ assert(box.SpaceScene.stats.terrainChunks<=64,'cache remains bounded for endless runs');
+ const cacheTest=boot();cacheTest.t.render();const samples=cacheTest.box.SpaceScene.stats.terrainSamples;
+ for(let i=0;i<100;i++)cacheTest.t.render();assert.equal(cacheTest.box.SpaceScene.stats.terrainSamples,samples,'stationary frames never recalculate terrain samples');
+ const adaptive=boot();await adaptive.t.start();adaptive.t.run.safe=100;const originalWidth=adaptive.el('world').width;
+ for(let i=1;i<=240;i++)adaptive.t.frame(i*1000/30);
+ assert(adaptive.el('world').width<originalWidth,'persistent slow frames reduce raster resolution');
+ assert(Math.abs(adaptive.t.run.time-8)<1e-8,'quality changes never slow game time');
+ console.log('PASS: gameplay, achievements, 30/60/90/120 Hz and jitter consistency, interruption pause, exact cached terrain and bounded cache.');
 })();

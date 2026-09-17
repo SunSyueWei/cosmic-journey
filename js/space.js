@@ -15,9 +15,19 @@ window.SpaceScene=(()=>{
  const hash=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v);};
  function phase(distance){const position=Math.max(0,distance)/RUN_CONFIG.planetDistance,index=Math.floor(position);const t=Math.min(1,(position-index)*RUN_CONFIG.planetDistance/RUN_CONFIG.transitionDistance);return {index:index%9,previous:mod(index-1,9),mix:index===0?1:t*t*(3-2*t)};}
  function rgb(hex){return hex.match(/[a-f\d]{2}/gi).map(n=>parseInt(n,16));}
- function blend(a,b,t){const x=rgb(a),y=rgb(b);return `rgb(${x.map((v,i)=>Math.round(v+(y[i]-v)*t)).join(',')})`;}
+ function blend(a,b,t){if(t>=1||a===b)return b;if(t<=0)return a;const x=rgb(a),y=rgb(b);return `rgb(${x.map((v,i)=>Math.round(v+(y[i]-v)*t)).join(',')})`;}
  function terrainY(x,type,layer){const base=Math.sin(x*.009+layer)*15+Math.sin(x*.023)*7;return base+(type==='ice'||type==='canyon'||type==='frost'?Math.abs(Math.sin(x*.017))*34:Math.sin(x*.004)*18);}
  function terrainPoints(scroll,width,type,layer){const spacing=16,start=Math.floor(scroll/spacing)-1,end=Math.ceil((scroll+width)/spacing)+1;const points=[];for(let i=start;i<=end;i++)points.push([i*spacing-scroll,terrainY(i*spacing,type,layer)]);return points;}
+ // Bounded world-coordinate chunks: reuse samples, never allocate vertex arrays per frame.
+ const terrainCache=new Map();let terrainSamples=0;
+ function sampleTerrain(index,type,layer){
+  const shape=['ice','canyon','frost'].includes(type)?'ice':'smooth',chunk=Math.floor(index/128),key=shape+':'+layer+':'+chunk;
+  let samples=terrainCache.get(key);
+  if(!samples){samples=new Float64Array(128);for(let j=0;j<128;j++)samples[j]=terrainY((chunk*128+j)*16,shape,layer);terrainSamples+=128;terrainCache.set(key,samples);if(terrainCache.size>64)terrainCache.delete(terrainCache.keys().next().value);}
+  return samples[index-chunk*128];
+ }
+ const stars=Array.from({length:45},(_,i)=>({x:hash(i+71),speed:.018+hash(i)*.016,y:hash(i+190),size:i%8?1:2,color:i%8?'#c5ddf5aa':'#fff3d2'}));
+ let backdrop,backdropKey='';
  let sky,skyWidth=0,skyHeight=0,planetCache=new Map();
  function buildSky(w,h){sky=document.createElement('canvas');sky.width=Math.ceil(w);sky.height=h;const c=sky.getContext('2d');const gradient=c.createLinearGradient(0,0,w,h);gradient.addColorStop(0,'#020919');gradient.addColorStop(.6,'#092246');gradient.addColorStop(1,'#172348');c.fillStyle=gradient;c.fillRect(0,0,w,h);
   // Nebula and stars are rasterized only when the viewport changes, never randomized per frame.
@@ -34,14 +44,19 @@ window.SpaceScene=(()=>{
   const shade=c.createLinearGradient(60,50,360,280);shade.addColorStop(0,'#fff2db22');shade.addColorStop(.45,'#03132b15');shade.addColorStop(1,'#02091cef');c.fillStyle=shade;c.fillRect(0,0,420,420);c.restore();planetCache.set(index,cvs);return cvs;
  }
  function paintPlanet(ctx,p,index,w,alpha){if(alpha<=0)return;ctx.save();ctx.globalAlpha=alpha;const size=Math.min(480,w*.7),x=w*.75-size/2,y=58;ctx.drawImage(planetTexture(index),x,y,size,size);if(p.type==='ring'){ctx.strokeStyle='#dbca9a83';ctx.lineWidth=12;ctx.beginPath();ctx.ellipse(x+size/2,y+size/2,size*.59,size*.14,-.32,0,Math.PI*2);ctx.stroke();}ctx.restore();}
- function draw(ctx,w,h,ground,distance){if(!sky||skyWidth!==w||skyHeight!==h)buildSky(w,h);ctx.drawImage(sky,0,0,w,h);const ph=phase(distance),a=planets[ph.previous],b=planets[ph.index],scroll=distance/RUN_CONFIG.metresPerPixel;
-  paintPlanet(ctx,a,ph.previous,w,1-ph.mix);paintPlanet(ctx,b,ph.index,w,ph.mix);
+ function draw(ctx,w,h,ground,distance){if(!sky||skyWidth!==w||skyHeight!==h){buildSky(w,h);backdropKey='';}const ph=phase(distance),a=planets[ph.previous],b=planets[ph.index],scroll=distance/RUN_CONFIG.metresPerPixel;
+  if(ph.mix===1){
+   const key=w+':'+h+':'+ph.index;if(key!==backdropKey){backdrop ||= document.createElement('canvas');backdrop.width=Math.ceil(w);backdrop.height=h;const c=backdrop.getContext('2d');c.drawImage(sky,0,0,w,h);paintPlanet(c,b,ph.index,w,1);backdropKey=key;}
+   ctx.drawImage(backdrop,0,0,w,h);
+  }else{ctx.drawImage(sky,0,0,w,h);paintPlanet(ctx,a,ph.previous,w,1-ph.mix);paintPlanet(ctx,b,ph.index,w,ph.mix);}
   // Individually wrapped stars keep their identity across the wrap boundary.
-  for(let i=0;i<45;i++){const x=mod(hash(i+71)*(w+40)-scroll*(.018+hash(i)*.016),w+40)-20;ctx.fillStyle=i%8?'#c5ddf5aa':'#fff3d2';ctx.fillRect(x,95+hash(i+190)*(ground-120),i%8?1:2,i%8?1:2);}
-  for(let layer=0;layer<2;layer++){const position=scroll*(layer===0?.13:.32);const ptsA=terrainPoints(position,w,a.type,layer),ptsB=terrainPoints(position,w,b.type,layer);ctx.fillStyle=blend(layer===0?'#152643':a.ridge,layer===0?'#152643':b.ridge,ph.mix);ctx.globalAlpha=layer===0?.8:.55;ctx.beginPath();ctx.moveTo(ptsA[0][0],ground);for(let i=0;i<ptsA.length;i++)ctx.lineTo(ptsA[i][0],ground-28-layer*5-(ptsA[i][1]*(1-ph.mix)+ptsB[i][1]*ph.mix));ctx.lineTo(w+30,ground+2);ctx.closePath();ctx.fill();ctx.globalAlpha=1;}
+  for(const star of stars){const x=mod(star.x*(w+40)-scroll*star.speed,w+40)-20;ctx.fillStyle=star.color;ctx.fillRect(x,95+star.y*(ground-120),star.size,star.size);}
+  for(let layer=0;layer<2;layer++){const position=scroll*(layer===0?.13:.32),first=Math.floor(position/16)-1,end=Math.ceil((position+w)/16)+1;ctx.fillStyle=blend(layer===0?'#152643':a.ridge,layer===0?'#152643':b.ridge,ph.mix);ctx.globalAlpha=layer===0?.8:.55;ctx.beginPath();ctx.moveTo(first*16-position,ground);
+   for(let i=first;i<=end;i++){const y=ph.mix===1?sampleTerrain(i,b.type,layer):ph.mix===0?sampleTerrain(i,a.type,layer):sampleTerrain(i,a.type,layer)*(1-ph.mix)+sampleTerrain(i,b.type,layer)*ph.mix;ctx.lineTo(i*16-position,ground-28-layer*5-y);}
+   ctx.lineTo(w+30,ground+2);ctx.closePath();ctx.fill();ctx.globalAlpha=1;}
   ctx.fillStyle=blend(a.soil,b.soil,ph.mix);ctx.fillRect(0,ground,w,h-ground);ctx.fillStyle=blend(a.color,b.color,ph.mix);ctx.fillRect(0,ground,w,2);
   // Terrain details are anchored to world IDs, not to recycled screen-array slots.
   const start=Math.floor(scroll/65)-1;for(let i=start;i<start+w/65+3;i++){const x=i*65-scroll;ctx.fillStyle='#d5e7ff20';ctx.beginPath();ctx.ellipse(x,ground+13+hash(i+600)*14,8+hash(i)*12,2,0,0,Math.PI*2);ctx.fill();}
  }
- return {planets,phase,terrainPoints,draw};
+ return {planets,phase,terrainPoints,draw,sampleTerrain,get stats(){return {terrainSamples,terrainChunks:terrainCache.size};}};
 })();
