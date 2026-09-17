@@ -8,7 +8,7 @@
  function panels(name){['start','pause','end'].forEach(n=>$(n+'-panel').hidden=n!==name);}
  async function start(){
    if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
-   const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name});reset();state='starting';
+   const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name});reset();RunAudio.reset();RunAudio.music(true);state='starting';
    const button=$('start');button.disabled=true;const label=button.textContent;button.textContent='準備出發…';
    try{run.sessionId=await RunStore.beginRun();}catch(_){run.sessionId=null;run.cloudError=true;}
    button.disabled=false;button.textContent=label;state='running';panels('');$('pause').disabled=false;last=performance.now();RunAudio.music(true);canvas.focus();savePlanetCard(0);
