@@ -14,13 +14,14 @@
     getAchievements:()=>Object.values(memory.achievements||{}),
     saveAchievement(record){memory.achievements||={};memory.achievements[record.id]=record;memory.achievement=record;save();},
     getAchievement:()=>memory.achievement||null,
-    nickname, getProfile:()=>({name:nickname(memory.name),best:Number(memory.best)||0,muted:memory.muted!==false,cloudConsent:memory.cloudConsent===true}),
+    // Default to sharing only when no previous preference exists; preserve explicit opt-out.
+    nickname, getProfile:()=>({name:nickname(memory.name),best:Number(memory.best)||0,muted:memory.muted!==false,cloudConsent:memory.cloudConsent!==false}),
     setProfile:values=>{Object.assign(memory,values);save();},
     async submit(result){
       const record={...result,name:nickname(result.name),playerId:id,date:new Date().toISOString(),eventId:RUN_CONFIG.eventId};
       memory.records=[...(Array.isArray(memory.records)?memory.records:[]),record].slice(-500);
       memory.best=Math.max(Number(memory.best)||0,record.score);save();
-      // Upload only after the player explicitly opts into the shared board.
+      // Upload only when the player's current leaderboard choice allows it.
       if(window.CloudScores?.enabled&&RunStore.getProfile().cloudConsent){if(!result.sessionId)throw new Error('本局未連上排行榜');await CloudScores.submit(record);}
       return record;
     },

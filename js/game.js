@@ -10,18 +10,18 @@
    if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
    if($('achievement').open)$('achievement').close();
    $('achievement-notice').getAnimations?.().forEach(animation=>animation.cancel());$('achievement-notice').textContent='';
-   const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name});reset();RunAudio.reset();RunAudio.music(true);state='starting';
+   const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name,cloudConsent:$('cloud-consent').checked});refreshPrivacy();reset();RunAudio.reset();RunAudio.music(true);state='starting';
    const button=$('start');button.disabled=true;const label=button.textContent;button.textContent='準備出發…';
    try{run.sessionId=await RunStore.beginRun();}catch(_){run.sessionId=null;run.cloudError=true;}
    button.disabled=false;button.textContent=label;state='running';panels('');$('pause').disabled=false;last=performance.now();RunAudio.music(true);canvas.focus();savePlanetCard(0);
-   toast(run.cloudError?'目前無法連線 · 本局僅存本機':'水星啟航卡已收藏 · 點一下跳躍',3);
+   toast(run.cloudError?'驗證未完成或連線失敗 · 本局僅存本機':'水星啟航卡已收藏 · 點一下跳躍',3);
    if(document.hidden)pause();
  }
  function toast(message,seconds=2){$('toast').textContent=message;toastTime=seconds;}
  function jump(){if(state!=='running')return;if(player.y<=.5){player.vy=C.jumpVelocity;RunAudio.jump();}}
  function pause(){if(state!=='running')return;state='paused';RunAudio.music(false);panels('pause');$('resume').focus();}
  function resume(){if(state!=='paused')return;state='running';panels('');last=performance.now();accumulator=0;RunAudio.music(true);canvas.focus();}
- async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const finishedRun=run;const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();const endCard=cardRecord(Math.min(9,run.nextCard-1));RunStore.saveAchievement(endCard);showAchievement(endCard);try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived,sessionId:run.sessionId,seconds:run.time,exactDistance:run.distance,cardsBefore:run.cardsBefore});const rows=await RunStore.list('event');if(state==='over'&&run===finishedRun){const mine=rows.find(r=>r.mine);$('rank-summary').textContent=mine?`${RunStore.cloudEnabled?'共用':'本機'}活動排行第 ${mine.rank} 名 · 挑戰下一個紀錄！`:'已保存成績。';}}catch(_){if(run===finishedRun)$('rank-summary').textContent='成績已留在本機，但未能上傳共用排行。';}}
+ async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const finishedRun=run;const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();const endCard=cardRecord(Math.min(9,run.nextCard-1));RunStore.saveAchievement(endCard);showAchievement(endCard);try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived,sessionId:run.sessionId,seconds:run.time,exactDistance:run.distance,cardsBefore:run.cardsBefore});if(!RunStore.getProfile().cloudConsent){if(state==='over'&&run===finishedRun)$('rank-summary').textContent='本局僅存本機，未上傳排行榜。';return;}const rows=await RunStore.list('event');if(state==='over'&&run===finishedRun){const mine=rows.find(r=>r.mine);$('rank-summary').textContent=mine?`${RunStore.cloudEnabled?'共用':'本機'}活動排行第 ${mine.rank} 名 · 挑戰下一個紀錄！`:'已保存成績。';}}catch(_){if(run===finishedRun)$('rank-summary').textContent='成績已留在本機，但未能上傳共用排行。';}}
  function arrival(){run.arrived=true;run.score+=C.arrivalBonus;run.safe=3;run.obstacles=[];run.spawn=3.5;toast('成功抵達福音聚會！\n宇宙浩瀚，但你從不孤單。\n+2,000 分 · 積分 ×1.5',3.5);RunAudio.cheer();for(let i=0;i<75;i++)run.particles.push({x:Math.random()*width,y:Math.random()*180,vx:(Math.random()-.5)*130,vy:40+Math.random()*100,color:['#9dc9ff','#fff0ca','#b7a3e0','#f2c7ab'][i%4],life:3.5});}
  function updateHUD(){const planet=SpaceScene.planets[SpaceScene.phase(run.distance).index];$('planet-name').textContent=planet.name+' · '+planet.land;$('planet-en').textContent=planet.en;$('velocity').textContent=(run.speed/C.startSpeed).toFixed(2)+'×';$('score').textContent=Math.floor(run.score).toString().padStart(5,'0');$('distance').textContent=Math.floor(run.distance).toLocaleString();$('cards').textContent=run.cards;$('remaining').textContent=run.arrived?'無限挑戰 · 積分 ×1.5':`還有 ${Math.max(0,Math.ceil(C.venueDistance-run.distance)).toLocaleString()} m`;$('route-label').textContent=run.arrived?'已抵達聚會 · 繼續探索星海':'目的地：福音聚會';$('progress').style.width=`${Math.min(100,run.distance/C.venueDistance*100)}%`;}
  // Fixed 120 Hz simulation avoids frame-rate dependent jumps and tunnelling.
@@ -136,10 +136,12 @@
  function refreshPrivacy(){
    const enabled=RunStore.cloudEnabled,profile=RunStore.getProfile();
    $('cloud-consent-label').hidden=!enabled;
+   $('sharing-help').hidden=!enabled;
    $('cloud-consent').checked=profile.cloudConsent;
    $('delete-cloud-scores').hidden=!enabled;
    $('privacy-summary').textContent=enabled&&profile.cloudConsent?'已參加共用排行榜；公開暱稱、最高分與距離。':'目前分數與收藏卡只保存在這個瀏覽器。';
  }
+ $('change-player-settings').onclick=()=>{if(state==='starting')return;pause();state='ready';panels('start');$('nickname').focus();};
  $('cloud-consent').addEventListener('change',()=>{
    const checked=$('cloud-consent').checked;RunStore.setProfile({cloudConsent:checked});
    $('privacy-status').textContent=checked?'已加入共用排行榜；下一局開始時會上傳成績。':'已停止上傳新成績；既有雲端成績仍可按下方按鈕刪除。';
