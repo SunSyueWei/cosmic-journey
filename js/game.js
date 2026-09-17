@@ -1,17 +1,25 @@
 (()=>{
  'use strict';
  const C=RUN_CONFIG,$=id=>document.getElementById(id),canvas=$('world'),ctx=canvas.getContext('2d');
- let width=960,height=500,ground=400,state='ready',run,muted=RunStore.getProfile().muted,tab='today',last=0,accumulator=0,toastTime=0;
+ let width=960,height=500,ground=400,state='ready',run,muted=false,tab='today',last=0,accumulator=0,toastTime=0;
  const player={x:95,y:0,vy:0,w:38,h:43,previousY:0};
- function resize(){const rect=canvas.getBoundingClientRect();height=500;width=Math.max(320,rect.width/rect.height*height);const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);ground=height-83;player.x=Math.min(130,width*.21);}
- function reset(){run={distance:0,previousDistance:0,score:0,cards:0,time:0,speed:C.startSpeed,arrived:false,nextCard:1,burstRemaining:0,milestone:0,obstacles:[],collectibles:[],particles:[],spawn:2.2,cardTimer:1.4,safe:0};player.y=0;player.previousY=0;player.vy=0;accumulator=0;toastTime=0;$('toast').textContent='';RunAudio.setSpeed(C.startSpeed);updateHUD();}
+ function resize(){const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;height=500;width=rect.width/rect.height*height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(rect.width*dpr);canvas.height=Math.round(rect.height*dpr);ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);ground=height-83;player.x=Math.min(130,width*.21);}
+ function reset(){run={distance:0,previousDistance:0,score:0,cards:0,cardsBefore:0,time:0,speed:C.startSpeed,arrived:false,nextCard:1,burstRemaining:0,milestone:0,obstacles:[],collectibles:[],particles:[],spawn:2.2,cardTimer:1.4,safe:0};player.y=0;player.previousY=0;player.vy=0;accumulator=0;toastTime=0;$('toast').textContent='';RunAudio.setSpeed(C.startSpeed);updateHUD();}
  function panels(name){['start','pause','end'].forEach(n=>$(n+'-panel').hidden=n!==name);}
- function start(){RunAudio.unlock();const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name});reset();state='running';panels('');$('pause').disabled=false;RunAudio.music(true);toast('點一下，跳起來！',2);canvas.focus();savePlanetCard(0);toast('水星啟航卡已收藏 · 點一下跳躍',2.5);}
+ async function start(){
+   if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
+   const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name});reset();state='starting';
+   const button=$('start');button.disabled=true;const label=button.textContent;button.textContent='準備出發…';
+   try{run.sessionId=await RunStore.beginRun();}catch(_){run.sessionId=null;run.cloudError=true;}
+   button.disabled=false;button.textContent=label;state='running';panels('');$('pause').disabled=false;last=performance.now();RunAudio.music(true);canvas.focus();savePlanetCard(0);
+   toast(run.cloudError?'目前無法連線 · 本局僅存本機':'水星啟航卡已收藏 · 點一下跳躍',3);
+   if(document.hidden)pause();
+ }
  function toast(message,seconds=2){$('toast').textContent=message;toastTime=seconds;}
  function jump(){if(state!=='running')return;if(player.y<=.5){player.vy=C.jumpVelocity;RunAudio.jump();}}
  function pause(){if(state!=='running')return;state='paused';RunAudio.music(false);panels('pause');$('resume').focus();}
  function resume(){if(state!=='paused')return;state='running';panels('');last=performance.now();accumulator=0;RunAudio.music(true);canvas.focus();}
- async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived});const rows=await RunStore.list('event');if(state==='over')$('rank-summary').textContent=`本機活動排行第 ${rows.find(r=>r.mine).rank} 名 · 挑戰下一個紀錄！`;}catch(_){$('rank-summary').textContent='成績暫時無法儲存，仍可再玩一次。';}}
+ async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const finishedRun=run;const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived,sessionId:run.sessionId,seconds:run.time,exactDistance:run.distance,cardsBefore:run.cardsBefore});const rows=await RunStore.list('event');if(state==='over'&&run===finishedRun){const mine=rows.find(r=>r.mine);$('rank-summary').textContent=mine?`${RunStore.cloudEnabled?'共用':'本機'}活動排行第 ${mine.rank} 名 · 挑戰下一個紀錄！`:'已保存成績。';}}catch(_){if(run===finishedRun)$('rank-summary').textContent='成績已留在本機，但未能上傳共用排行。';}}
  function arrival(){run.arrived=true;run.score+=C.arrivalBonus;run.safe=3;run.obstacles=[];run.spawn=3.5;toast('成功抵達福音聚會！\n宇宙浩瀚，但你從不孤單。\n+2,000 分 · 積分 ×1.5',3.5);RunAudio.cheer();for(let i=0;i<75;i++)run.particles.push({x:Math.random()*width,y:Math.random()*180,vx:(Math.random()-.5)*130,vy:40+Math.random()*100,color:['#9dc9ff','#fff0ca','#b7a3e0','#f2c7ab'][i%4],life:3.5});}
  function updateHUD(){const planet=SpaceScene.planets[SpaceScene.phase(run.distance).index];$('planet-name').textContent=planet.name+' · '+planet.land;$('planet-en').textContent=planet.en;$('velocity').textContent=(run.speed/C.startSpeed).toFixed(2)+'×';$('score').textContent=Math.floor(run.score).toString().padStart(5,'0');$('distance').textContent=Math.floor(run.distance).toLocaleString();$('cards').textContent=run.cards;$('remaining').textContent=run.arrived?'無限挑戰 · 積分 ×1.5':`還有 ${Math.max(0,Math.ceil(C.venueDistance-run.distance)).toLocaleString()} m`;$('route-label').textContent=run.arrived?'已抵達聚會 · 繼續探索星海':'目的地：福音聚會';$('progress').style.width=`${Math.min(100,run.distance/C.venueDistance*100)}%`;}
  // Fixed 120 Hz simulation avoids frame-rate dependent jumps and tunnelling.
@@ -41,7 +49,7 @@
      const impactY=player.previousY+(player.y-player.previousY)*impact;
      if(run.safe<=0&&crosses&&impactY<obstacle.h-5){finish();return;}
    }
-   for(const card of run.collectibles){card.x-=run.speed*dt;if(!card.taken&&px<card.x+24&&px+player.w-10>card.x&&py<ground-card.y+18&&py+player.h>ground-card.y){card.taken=true;run.cards++;run.score+=C.cardPoints*(run.arrived?C.afterMultiplier:1);RunAudio.card();}}
+   for(const card of run.collectibles){card.x-=run.speed*dt;if(!card.taken&&px<card.x+24&&px+player.w-10>card.x&&py<ground-card.y+18&&py+player.h>ground-card.y){card.taken=true;run.cards++;if(!run.arrived)run.cardsBefore++;run.score+=C.cardPoints*(run.arrived?C.afterMultiplier:1);RunAudio.card();}}
    run.obstacles=run.obstacles.filter(o=>o.x+o.w>-20);run.collectibles=run.collectibles.filter(c=>c.x>-40&&!c.taken);
    for(const p of run.particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;}run.particles=run.particles.filter(p=>p.life>0);
    if(toastTime>0){toastTime-=dt;if(toastTime<=0)$('toast').textContent='';}
@@ -112,7 +120,34 @@
  let hudElapsed=0;
  function frame(now){const dt=Math.min((now-last)/1000||0,.05);last=now;if(state==='running'){accumulator+=dt;while(accumulator>=1/120&&state==='running'){step(1/120);accumulator-=1/120;}hudElapsed+=dt;if(hudElapsed>=.1){updateHUD();hudElapsed=0;}}draw();requestAnimationFrame(frame);}
  async function showRanking(){pause();$('ranking').showModal();await renderRanking();}
- async function renderRanking(){const rows=await RunStore.list(tab),list=$('rank-list');list.replaceChildren();rows.forEach(r=>{const row=document.createElement('div');row.className='rank-row'+(r.mine?' mine':'');const rank=document.createElement('b');rank.textContent=String(r.rank).padStart(2,'0');const name=document.createElement('div');name.textContent=r.name+(r.mine?'（你）':'');const detail=document.createElement('small');detail.textContent=`${r.demo?'示範 · ':''}${r.distance.toLocaleString()} m · ${r.distance>=C.venueDistance?'已抵達':'途中'}`;name.append(detail);const score=document.createElement('strong');score.textContent=r.score.toLocaleString();row.append(rank,name,score);list.append(row);});}
+ let rankingRequest=0;
+ async function renderRanking(){
+   const request=++rankingRequest,list=$('rank-list');list.replaceChildren();$('ranking-note').textContent=RunStore.cloudEnabled?'共用排行榜 · 正在取得最新成績…':'本機排行榜 · 示範選手已標記，尚未跨手機連線。';
+   try{const rows=await RunStore.list(tab);if(request!==rankingRequest)return;
+   if(RunStore.cloudEnabled)$('ranking-note').textContent='共用排行榜 · 台灣時間 · 前 100 名及你的排名';
+   if(!rows.length){list.textContent='還沒有成績，來當第一位星海旅人！';return;}
+   rows.forEach(r=>{const row=document.createElement('div');row.className='rank-row'+(r.mine?' mine':'');const rank=document.createElement('b');rank.textContent=String(r.rank).padStart(2,'0');const name=document.createElement('div');name.textContent=r.name+(r.mine?'（你）':'');const detail=document.createElement('small');detail.textContent=`${r.demo?'示範 · ':''}${r.distance.toLocaleString()} m · ${r.distance>=C.venueDistance?'已抵達':'途中'}`;name.append(detail);const score=document.createElement('strong');score.textContent=r.score.toLocaleString();row.append(rank,name,score);list.append(row);});
+   }catch(_){if(request===rankingRequest){$('ranking-note').textContent='共用排行榜暫時無法連線';list.textContent='請稍後切換排行頁籤重試；本機紀錄仍會保留。';}}
+ }
+ function refreshPrivacy(){
+   const enabled=RunStore.cloudEnabled,profile=RunStore.getProfile();
+   $('cloud-consent-label').hidden=!enabled;
+   $('cloud-consent').checked=profile.cloudConsent;
+   $('delete-cloud-scores').hidden=!enabled;
+   $('privacy-summary').textContent=enabled&&profile.cloudConsent?'已參加共用排行榜；公開暱稱、最高分與距離。':'目前分數與收藏卡只保存在這個瀏覽器。';
+ }
+ $('cloud-consent').addEventListener('change',()=>{
+   const checked=$('cloud-consent').checked;RunStore.setProfile({cloudConsent:checked});
+   $('privacy-status').textContent=checked?'已加入共用排行榜；下一局開始時會上傳成績。':'已停止上傳新成績；既有雲端成績仍可按下方按鈕刪除。';
+   refreshPrivacy();
+ });
+ $('delete-cloud-scores').onclick=async()=>{
+   if(!RunStore.cloudEnabled)return;
+   if(!window.confirm('確定刪除這個瀏覽器匿名身分的所有雲端成績嗎？此動作無法復原。'))return;
+   const button=$('delete-cloud-scores');button.disabled=true;$('privacy-status').textContent='正在刪除…';
+   try{const count=await RunStore.deleteCloudScores();$('privacy-status').textContent=`已刪除 ${Number(count)||0} 筆雲端成績。`;}catch(_){$('privacy-status').textContent='刪除失敗，請稍後再試或聯絡主辦人。';}
+   finally{button.disabled=false;}
+ };
  $('start').onclick=start;document.querySelectorAll('.restart').forEach(b=>b.onclick=start);$('pause').onclick=pause;$('resume').onclick=resume;$('leaderboard').onclick=showRanking;$('end-ranking').onclick=showRanking;$('close-ranking').onclick=()=>$('ranking').close();
  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));renderRanking();});
  function soundUI(){$('sound').innerHTML=`♫ <span>${muted?'聲音關閉':'聲音開啟'}</span>`;$('sound').setAttribute('aria-label',muted?'開啟聲音':'關閉聲音');$('sound').setAttribute('aria-pressed',String(!muted));RunAudio.mute(muted);}
@@ -121,13 +156,14 @@
  document.addEventListener('keydown',e=>{if(e.target.matches('input,button')||$('ranking').open||$('achievement').open)return;if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();if(!e.repeat)jump();}if(e.code==='Escape'||e.code==='KeyP'){if(state==='running')pause();else if(state==='paused')resume();}});
  document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',pause);window.addEventListener('resize',resize);
  $('nickname').value=RunStore.getProfile().name;$('nickname').addEventListener('change',()=>{$('nickname').value=RunStore.nickname($('nickname').value);});
- resize();reset();soundUI();requestAnimationFrame(frame);
+ resize();reset();soundUI();refreshPrivacy();requestAnimationFrame(frame);
+ if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);
  // Explicit opt-in diagnostic surface, absent in normal play.
  if(new URLSearchParams(location.search).has('test'))window.RunTest={frame,start,jump,step,finish,pause,resume,get state(){return state;},get run(){return run;},get player(){return player;},render:()=>{updateHUD();draw();}};
  if(new URLSearchParams(location.search).has('test')){
    const preview=document.createElement('button');preview.className='outline';preview.textContent='測試：九星成就流程';
-   preview.onclick=()=>{start();run.nextCard=9;run.distance=C.planetDistance*9-.01;run.previousDistance=run.distance;run.arrived=true;run.score=9200;run.time=95;run.cards=12;step(1/120);};
+   preview.onclick=async()=>{await start();run.nextCard=9;run.distance=C.planetDistance*9-.01;run.previousDistance=run.distance;run.arrived=true;run.score=9200;run.time=95;run.cards=12;step(1/120);};
    $('last-achievement').after(preview);
-   SpaceScene.planets.forEach((planet,index)=>{const button=document.createElement('button');button.className='outline';button.textContent='測試卡片：'+planet.name;button.onclick=()=>{start();run.distance=index*C.planetDistance;run.nextCard=index+1;unlockAchievement(index);};preview.after(button);});
+   SpaceScene.planets.forEach((planet,index)=>{const button=document.createElement('button');button.className='outline';button.textContent='測試卡片：'+planet.name;button.onclick=async()=>{await start();run.distance=index*C.planetDistance;run.nextCard=index+1;unlockAchievement(index);};preview.after(button);});
  }
 })();

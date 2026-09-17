@@ -14,9 +14,20 @@
 
 Pages 使用 main 分支根目錄，自動發布每次推送；`.nojekyll` 表示直接提供靜態檔案。更新後如有快取問題，同步更新 index.html 的資源版本參數。
 
-**排行榜目前仍為本機紀錄，不是共用排行榜。** GitHub 儲存程式碼；Pages 提供網頁；分數、暱稱、最高分和收藏卡存在每位玩家瀏覽器的 localStorage，不會傳送到 GitHub。不同裝置、瀏覽器、網址來源（例如 localhost 與正式 Pages）各有獨立紀錄，清除網站資料會刪除紀錄。要跨手機競賽，需要另外接上後端資料庫及成績驗證服務。
+GitHub 只儲存程式碼，Pages 只提供靜態網頁；它不會保存玩家分數。現在共用排行榜已接上 Supabase：玩家只有勾選「參加共用排行榜」後，該局才會以匿名身分上傳暱稱、分數、距離與卡片數；單純查看排行榜不建立帳號。未勾選仍可完整遊玩，紀錄只留在裝置的 localStorage。暱稱請勿使用真名、電話、學校或班級。
+
+## 共用排行榜與安全設定
+
+- `js/cloud-config.js` 只包含 Supabase Project URL 與 `sb_publishable_` Publishable Key。這類前端金鑰本來就會被玩家看見；絕不能放入 `service_role`、`sb_secret_`、資料庫密碼或其他私密金鑰。
+- Supabase 的 `supabase/setup.sql` 需在 SQL Editor 執行，並在 Authentication → Sign In / Providers 開啟 Anonymous Sign-Ins。正式活動若要開啟 Supabase CAPTCHA/Turnstile，需同時把 token 介接到 `cloud.js`；只在 Dashboard 單方面強制開啟會讓登入失敗。
+- 資料表啟用 RLS、撤銷 anon/authenticated 直接讀寫；排行榜函式只回傳公開欄位，其餘三個受限函式才處理開局、提交與刪除自己的成績。伺服器依距離、時間與光門前後卡片數重新計分；前端不能直接指定分數。
+- 遊戲頁的「刪除我的雲端成績」只刪除目前瀏覽器匿名身分的遊戲紀錄，不會刪除 Supabase 驗證技術日誌。清除瀏覽器資料後會失去原匿名身分；遺失身分時請向主辦人提出刪除要求。
+- GitHub Pages 已使用 HTTPS；頁面另設 CSP、`no-referrer`、只允許連到本專案 Supabase 網域。GitHub Pages 無法自訂 `frame-ancestors` 等 HTTP 安全標頭，如需防嵌入可改用 Cloudflare Pages／自有網域加標頭。
+- Supabase Free 專案可能因長時間無活動暫停，活動前請登入 Dashboard 確認專案狀態、RLS 與 Anonymous Sign-Ins。排行榜只回傳公開暱稱、分數、距離及名次，不回傳 user ID、token 或場次 ID。
 
 ## 操作與規則
+
+進入頁面後預設開啟聲音，點「啟程」時播放音樂；同一次頁面內手動靜音後，重新開始仍保持靜音。聲音按鈕在遊戲右上角。手機橫向使用接近整個可視螢幕，Canvas 依容器比例重新計算世界寬度，避免拉伸；排行榜及隱私設定可往下捲動使用。相關版面規則在 `layout.css`。
 
 點畫面／空白鍵／方向上鍵跳躍，落地後才能再跳。晶岩、裂隙和隕石碰撞即結算。P、Escape 或暫停按鈕可暫停；切換視窗或 App 自動暫停。觸控手勢限制只作用在遊戲 Canvas，其他介面保留縮放。
 
@@ -60,18 +71,20 @@ Pages 使用 main 分支根目錄，自動發布每次推送；`.nojekyll` 表�
 - js/space.js：九星球、快取星空、連續世界座標地形與 28 m 漸變轉場。
 - js/achievement.js：行星卡與完整旅程卡繪製、PNG 下載。
 - js/audio.js：音訊時鐘排程、速度連動節拍、音效。
-- js/storage.js：localStorage 與未來可替換的 async 排行榜介面。
+- js/storage.js：localStorage、隱私同意與可替換的 async 排行榜介面。
+- js/cloud-config.js、js/cloud.js：Supabase REST/匿名登入配接層；可替換成其他後端而不改遊戲邏輯。
+- SECURITY.md：發布前檢查、私密金鑰事故處理與玩家資料請求措施。
 
 畫面使用固定星點與世界座標地形，避免回捲時突然換圖；星空與行星紋理快取，HUD 每秒更新 10 次。更換角色可修改 astronaut()，更換背景修改 SpaceScene。改變跳躍物理時需同時確認障礙間距。
 
 ## 資料與排行榜
 
-排行榜是本機展示版，三位示範選手皆有標記。今日排行依裝置日期計算，本次活動依 eventId 篩選；每位裝置選手顯示最高分，同分以距離及時間排序。保存最近 500 局、個人最高分、暱稱、音量與收藏卡；清除網站資料會移除紀錄。localStorage 不可用時退回記憶體。
+共用模式的今日排行以台灣日期計算，本次活動依 `eventId` 篩選；每個匿名玩家只顯示最佳成績，同分以距離及提交時間排序。未連線或未啟用時，會回到本機示範排行。保存最近 500 局、個人最高分、暱稱、音量、參加選擇與收藏卡；清除網站資料會移除本機紀錄。localStorage 不可用時退回記憶體。
 
-若未來串接後端，替換 RunStore.submit(result)、list(period)，使用匿名身分及伺服器成績驗證，移除示範資料。現階段不支援跨手機競賽，也不提供防作弊保證。file:// 儲存行為依瀏覽器而異，測試建議使用 HTTP。
+若未來改用 Supabase Edge Function、Firebase Callable Function 或其他後端，只需替換 `js/cloud.js` 的 `begin/submit/list/deleteMine`，保留 `RunStore` 介面；伺服器端必須繼續驗證成績、RLS/規則及刪除權限。這是基本合理性驗證，不是完整伺服器重播防作弊；不要將未驗證的客戶端分數直接寫入公開表。file:// 儲存行為依瀏覽器而異，測試建議使用 HTTP。
 
 ## 驗證
 
-執行 `node tests/smoke.cjs` 與 `node tests/audio.cjs`。涵蓋開始、跳躍、三種碰撞、到站、無上限加速、高速掃掠、障礙間距與隨機模式、每千公尺解鎖、九張卡持久化、9,000 m 成就、安全繼續、PNG 匯出程式路徑、音樂調速、暫停與靜音，以及不同更新頻率的行進一致性。
+執行 `node tests/smoke.cjs`、`node tests/audio.cjs`、`node tests/cloud.cjs` 與 `node tests/privacy.cjs`。涵蓋開始、跳躍、三種碰撞、到站、無上限加速、高速掃掠、障礙間距與隨機模式、每千公尺解鎖、九張卡持久化、9,000 m 成就、安全繼續、PNG 匯出程式路徑、音樂調速、暫停與靜音、不同更新頻率的行進一致性、匿名登入並發、伺服器計分 payload、雲端錯誤，以及「未同意不上傳」和刪除委派。
 
 `?test=1` 使用獨立測試儲存，頁面底部提供各星球卡與完整旅程測試按鈕；不會污染正常遊玩的成績及收藏。實際音訊、手機手感仍可在活動裝置上試玩調整。

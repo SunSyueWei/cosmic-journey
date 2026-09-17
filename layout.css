@@ -1,0 +1,28 @@
+/* Keep controls reachable above the start/pause overlays. */
+.game-sound{position:absolute;right:12px;top:12px;z-index:3;min-width:44px;background:#10223deb;border:1px solid #435570}
+.game-sound span{display:none}
+.hud{padding-right:68px;gap:clamp(10px,3vw,42px)}
+.hud>div{min-width:0}
+.hud strong{font-size:clamp(14px,3vw,22px)}
+.hud button{flex-shrink:0}
+/* Landscape uses the available screen instead of a compressed card under a header.
+   The canvas world recalculates its width from this exact aspect ratio. */
+@media (orientation:landscape) and (max-height:550px){
+ .shell{padding:8px max(8px,env(safe-area-inset-right)) 16px max(8px,env(safe-area-inset-left))}
+ .shell>header{display:none}
+ .heading{display:flex;margin:12px 0;order:2}
+ .heading h1,.heading .intro,.heading .eyebrow{display:none}
+ .shell{display:flex;flex-direction:column}
+ .game{order:1;height:calc(100svh - 16px);min-height:240px;flex:none;border-radius:12px}
+ #world{height:100%;min-height:0;width:100%}
+ .shell>.notes,.shell>#last-achievement,.shell>.privacy-settings,.shell>footer{order:3}
+ .hud{padding:10px 68px 10px 16px}
+ .game-sound{top:8px;right:8px}
+ .sector{top:68px;left:16px;gap:3px}
+ .route{bottom:8px;left:16px;right:16px}
+ .overlay{padding:58px 12px 12px;align-items:flex-start;overflow:auto}
+ .start-card,.panel{margin:0 auto;width:min(420px,100%);padding:12px 20px}
+ .start-card h2{white-space:normal}
+ .start-card .pill,.start-card .hint{display:none}
+ #toast{top:115px;font-size:12px}
+}
