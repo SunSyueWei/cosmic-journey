@@ -1,6 +1,6 @@
 /* Only the public site key belongs in this file. Configure the secret in Supabase. */
 window.RunCaptcha=(()=>{
- const siteKey=''; // Cloudflare Turnstile production site key; never the secret key.
+ const siteKey='0x4AAAAAAE5s9f4cO5EhQjne'; // Public site key; never the secret key.
  let loader,pending;
  function load(){
   if(window.turnstile)return Promise.resolve();
