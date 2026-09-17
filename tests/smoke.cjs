@@ -64,5 +64,10 @@ function boot(){
  for(let i=1;i<=240;i++)adaptive.t.frame(i*1000/30);
  assert(adaptive.el('world').width<originalWidth,'persistent slow frames reduce raster resolution');
  assert(Math.abs(adaptive.t.run.time-8)<1e-8,'quality changes never slow game time');
+ const music=boot();await music.t.start();music.t.run.safe=100;const stages=[];music.box.RunAudio.setStage=value=>stages.push(value);
+ for(let i=0;i<1200;i++)music.t.step(1/120);assert.deepEqual(stages,[],'continuous sailing acceleration never changes music within a planet');
+ music.t.run.distance=999.99;music.t.step(1/120);assert.deepEqual(stages,[1]);
+ music.t.run.distance=1999.99;music.t.step(1/120);assert.deepEqual(stages,[1,2]);
+ music.t.run.distance=8999.99;music.t.step(1/120);assert.deepEqual(stages,[1,2,9],'planet loop must retain absolute music stage');
  console.log('PASS: gameplay, achievements, 30/60/90/120 Hz and jitter consistency, interruption pause, exact cached terrain and bounded cache.');
 })();

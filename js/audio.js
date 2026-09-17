@@ -1,5 +1,5 @@
 window.RunAudio=(()=>{
-  let ctx,muted=true,playing=false,track,rate=1,rateElapsed=0;
+  let ctx,muted=true,playing=false,track,rate=1,stage=0;
   const voices=new Set();
   function musicTrack(){
     if(!track&&window.Audio){track=new Audio('assets/audio/cosmic-mystery.m4a');track.loop=true;track.preload='auto';track.volume=.45;track.preservesPitch=true;track.playbackRate=rate;}
@@ -17,11 +17,10 @@ window.RunAudio=(()=>{
   function stopVoices(all=false){for(const voice of voices){if(all||voice.background){voice.g.gain.cancelScheduledValues(ctx.currentTime);voice.g.gain.setValueAtTime(0,ctx.currentTime);try{voice.o.stop();}catch(_){}}}}
   return {
     unlock(){try{ctx ||= new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume().catch(()=>{});}catch(_){}},
-    // Smooth acceleration, up to 1.8x for a listenable vocal track; no game speed cap.
-    // Updating a pitch-preserving audio decoder every physics tick can produce glitches.
-    // Batch small rate changes to at most once per second without restarting playback.
-    setSpeed(speed,dt=1){const extra=Math.max(0,speed-RUN_CONFIG.startSpeed);rate=1+.8*extra/(extra+400);rateElapsed+=dt;if(rateElapsed>=1){rateElapsed=0;if(track&&Math.abs(track.playbackRate-rate)>=.01)track.playbackRate=rate;}},
-    reset(){if(track){track.pause();track.currentTime=0;track.playbackRate=1;}rate=1;rateElapsed=0;},
+    // One rate change per 1,000 m scene, never tied to continuously rising game speed.
+    // Keep the absolute stage after the nine planets loop; do not restart the song.
+    setStage(value){const next=Math.max(0,Math.floor(Number(value)||0));if(next===stage)return;stage=next;rate=Math.min(RUN_CONFIG.musicMaxRate,1+stage*RUN_CONFIG.musicRateStep);if(track&&Math.abs(track.playbackRate-rate)>.0001)track.playbackRate=rate;},
+    reset(){if(track){track.pause();track.currentTime=0;track.playbackRate=1;}rate=1;stage=0;},
     mute(value){muted=value;if(muted){track?.pause();stopVoices(true);}else playTrack();},
     music(on){const wasPlaying=playing;playing=on;if(!on){track?.pause();stopVoices();return;}if(!wasPlaying||track?.paused)playTrack();},
     jump(){tone(520,.13,'triangle');},card(){tone(880,.13);},hit(){tone(160,.2,'triangle');},

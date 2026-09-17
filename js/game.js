@@ -5,7 +5,7 @@
  const player={x:95,y:0,vy:0,w:38,h:43,previousY:0};
  let quality=1.5,dirty=true,qualityTime=0,qualityFrames=0;
  function resize(){const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;height=500;width=rect.width/rect.height*height;const dpr=Math.min(devicePixelRatio||1,quality,Math.sqrt(1500000/(rect.width*rect.height))),pw=Math.round(rect.width*dpr),ph=Math.round(rect.height*dpr);if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph;}ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);ground=height-83;player.x=Math.min(130,width*.21);dirty=true;}
- function reset(){run={distance:0,previousDistance:0,score:0,cards:0,cardsBefore:0,time:0,speed:C.startSpeed,arrived:false,nextCard:1,burstRemaining:0,milestone:0,obstacles:[],collectibles:[],particles:[],spawn:2.2,cardTimer:1.4,safe:0};player.y=0;player.previousY=0;player.vy=0;accumulator=0;toastTime=0;$('toast').textContent='';RunAudio.setSpeed(C.startSpeed);updateHUD();}
+ function reset(){run={distance:0,previousDistance:0,score:0,cards:0,cardsBefore:0,time:0,speed:C.startSpeed,arrived:false,nextCard:1,burstRemaining:0,milestone:0,obstacles:[],collectibles:[],particles:[],spawn:2.2,cardTimer:1.4,safe:0};player.y=0;player.previousY=0;player.vy=0;accumulator=0;toastTime=0;$('toast').textContent='';RunAudio.setStage(0);updateHUD();}
  function panels(name){['start','pause','end'].forEach(n=>$(n+'-panel').hidden=n!==name);dirty=true;}
  async function start(){
    if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
@@ -28,7 +28,8 @@
  // Fixed 120 Hz simulation avoids frame-rate dependent jumps and tunnelling.
  function step(dt){
    run.previousDistance=run.distance;player.previousY=player.y;
-   run.time+=dt;run.speed+=(run.arrived?C.afterAcceleration:C.acceleration)*dt;RunAudio.setSpeed(run.speed,dt);const metres=run.speed*dt*C.metresPerPixel,old=run.distance;run.distance+=metres;
+   run.time+=dt;run.speed+=(run.arrived?C.afterAcceleration:C.acceleration)*dt;const metres=run.speed*dt*C.metresPerPixel,old=run.distance;run.distance+=metres;
+   if(Math.floor(old/C.planetDistance)!==Math.floor(run.distance/C.planetDistance))RunAudio.setStage(Math.floor(run.distance/C.planetDistance));
    const before=Math.max(0,Math.min(metres,C.venueDistance-old));run.score+=before+(metres-before)*C.afterMultiplier;
    if(!run.arrived&&run.distance>=C.venueDistance)arrival();
    if(run.arrived){const milestone=Math.floor((run.distance-C.venueDistance)/C.milestoneDistance);if(milestone>run.milestone){run.score+=(milestone-run.milestone)*C.milestoneBonus;run.milestone=milestone;toast(`又前進 500 m！ +${C.milestoneBonus} 分`);}}
