@@ -14,5 +14,8 @@ track.currentTime=42;a.music(false);assert(track.paused);a.music(true);assert.eq
 a.mute(true);assert(track.paused);a.mute(false);assert(!track.paused);
 a.music(false);a.mute(true);a.mute(false);assert(track.paused);
 a.reset();assert.equal(track.currentTime,0);assert.equal(track.playbackRate,1);
+let writes=0,currentRate=1;Object.defineProperty(track,'playbackRate',{get:()=>currentRate,set:value=>{writes++;currentRate=value;}});
+for(let i=0;i<1200;i++)a.setSpeed(300+i,1/120);
+assert(writes<=10,'decoder rate updates must not follow 120 Hz simulation');assert(currentRate>1);
 a.music(true);assert.equal(count,1);assert(fs.statSync('assets/audio/cosmic-mystery.mp3').size>0);
 console.log('PASS: MP3 loop, acceleration, pause/resume position, mute, reset and single audio instance.');

@@ -8,6 +8,8 @@
  function panels(name){['start','pause','end'].forEach(n=>$(n+'-panel').hidden=n!==name);}
  async function start(){
    if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
+   if($('achievement').open)$('achievement').close();
+   $('achievement-notice').getAnimations?.().forEach(animation=>animation.cancel());$('achievement-notice').textContent='';
    const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name});reset();RunAudio.reset();RunAudio.music(true);state='starting';
    const button=$('start');button.disabled=true;const label=button.textContent;button.textContent='準備出發…';
    try{run.sessionId=await RunStore.beginRun();}catch(_){run.sessionId=null;run.cloudError=true;}
@@ -19,13 +21,13 @@
  function jump(){if(state!=='running')return;if(player.y<=.5){player.vy=C.jumpVelocity;RunAudio.jump();}}
  function pause(){if(state!=='running')return;state='paused';RunAudio.music(false);panels('pause');$('resume').focus();}
  function resume(){if(state!=='paused')return;state='running';panels('');last=performance.now();accumulator=0;RunAudio.music(true);canvas.focus();}
- async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const finishedRun=run;const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived,sessionId:run.sessionId,seconds:run.time,exactDistance:run.distance,cardsBefore:run.cardsBefore});const rows=await RunStore.list('event');if(state==='over'&&run===finishedRun){const mine=rows.find(r=>r.mine);$('rank-summary').textContent=mine?`${RunStore.cloudEnabled?'共用':'本機'}活動排行第 ${mine.rank} 名 · 挑戰下一個紀錄！`:'已保存成績。';}}catch(_){if(run===finishedRun)$('rank-summary').textContent='成績已留在本機，但未能上傳共用排行。';}}
+ async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const finishedRun=run;const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();const endCard=cardRecord(Math.min(9,run.nextCard-1));RunStore.saveAchievement(endCard);showAchievement(endCard);try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived,sessionId:run.sessionId,seconds:run.time,exactDistance:run.distance,cardsBefore:run.cardsBefore});const rows=await RunStore.list('event');if(state==='over'&&run===finishedRun){const mine=rows.find(r=>r.mine);$('rank-summary').textContent=mine?`${RunStore.cloudEnabled?'共用':'本機'}活動排行第 ${mine.rank} 名 · 挑戰下一個紀錄！`:'已保存成績。';}}catch(_){if(run===finishedRun)$('rank-summary').textContent='成績已留在本機，但未能上傳共用排行。';}}
  function arrival(){run.arrived=true;run.score+=C.arrivalBonus;run.safe=3;run.obstacles=[];run.spawn=3.5;toast('成功抵達福音聚會！\n宇宙浩瀚，但你從不孤單。\n+2,000 分 · 積分 ×1.5',3.5);RunAudio.cheer();for(let i=0;i<75;i++)run.particles.push({x:Math.random()*width,y:Math.random()*180,vx:(Math.random()-.5)*130,vy:40+Math.random()*100,color:['#9dc9ff','#fff0ca','#b7a3e0','#f2c7ab'][i%4],life:3.5});}
  function updateHUD(){const planet=SpaceScene.planets[SpaceScene.phase(run.distance).index];$('planet-name').textContent=planet.name+' · '+planet.land;$('planet-en').textContent=planet.en;$('velocity').textContent=(run.speed/C.startSpeed).toFixed(2)+'×';$('score').textContent=Math.floor(run.score).toString().padStart(5,'0');$('distance').textContent=Math.floor(run.distance).toLocaleString();$('cards').textContent=run.cards;$('remaining').textContent=run.arrived?'無限挑戰 · 積分 ×1.5':`還有 ${Math.max(0,Math.ceil(C.venueDistance-run.distance)).toLocaleString()} m`;$('route-label').textContent=run.arrived?'已抵達聚會 · 繼續探索星海':'目的地：福音聚會';$('progress').style.width=`${Math.min(100,run.distance/C.venueDistance*100)}%`;}
  // Fixed 120 Hz simulation avoids frame-rate dependent jumps and tunnelling.
  function step(dt){
    run.previousDistance=run.distance;player.previousY=player.y;
-   run.time+=dt;run.speed+=(run.arrived?C.afterAcceleration:C.acceleration)*dt;RunAudio.setSpeed(run.speed);const metres=run.speed*dt*C.metresPerPixel,old=run.distance;run.distance+=metres;
+   run.time+=dt;run.speed+=(run.arrived?C.afterAcceleration:C.acceleration)*dt;RunAudio.setSpeed(run.speed,dt);const metres=run.speed*dt*C.metresPerPixel,old=run.distance;run.distance+=metres;
    const before=Math.max(0,Math.min(metres,C.venueDistance-old));run.score+=before+(metres-before)*C.afterMultiplier;
    if(!run.arrived&&run.distance>=C.venueDistance)arrival();
    if(run.arrived){const milestone=Math.floor((run.distance-C.venueDistance)/C.milestoneDistance);if(milestone>run.milestone){run.score+=(milestone-run.milestone)*C.milestoneBonus;run.milestone=milestone;toast(`又前進 500 m！ +${C.milestoneBonus} 分`);}}
@@ -71,7 +73,9 @@
  }
  function unlockAchievement(index){
    run.achievement=savePlanetCard(index);
-   state='achievement';run.obstacles=[];run.safe=2;run.spawn=2.5;run.burstRemaining=0;RunAudio.music(false);RunAudio.cheer();updateHUD();showAchievement(run.achievement);
+   const notice=$('achievement-notice');notice.textContent='✧ 已收藏 · '+run.achievement.title;
+   notice.getAnimations?.().forEach(animation=>animation.cancel());
+   notice.animate?.([{opacity:0},{opacity:.75,offset:.15},{opacity:.75,offset:.65},{opacity:0}],{duration:3200,fill:'forwards'});
  }
  $('save-achievement').onclick=()=>{try{AchievementCard.download($('achievement-card'),selectedCard);$('achievement-status').textContent='已準備 PNG 下載；也可以直接截圖保留。';}catch(_){$('achievement-status').textContent='此瀏覽器未能下載，請直接截圖保存成就卡。';}};
  $('continue-achievement').onclick=()=>$('achievement').close();
