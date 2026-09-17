@@ -2,7 +2,7 @@ window.RunAudio=(()=>{
   let ctx,muted=true,playing=false,track,rate=1,rateElapsed=0;
   const voices=new Set();
   function musicTrack(){
-    if(!track&&window.Audio){track=new Audio('assets/audio/cosmic-mystery.mp3');track.loop=true;track.preload='auto';track.volume=.45;track.preservesPitch=true;track.playbackRate=rate;}
+    if(!track&&window.Audio){track=new Audio('assets/audio/cosmic-mystery.m4a');track.loop=true;track.preload='auto';track.volume=.45;track.preservesPitch=true;track.playbackRate=rate;}
     return track;
   }
   function playTrack(){const audio=musicTrack();if(audio&&playing&&!muted){const attempt=audio.play();attempt?.catch(()=>{});}}
@@ -18,7 +18,7 @@ window.RunAudio=(()=>{
   return {
     unlock(){try{ctx ||= new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume().catch(()=>{});}catch(_){}},
     // Smooth acceleration, up to 1.8x for a listenable vocal track; no game speed cap.
-    // Updating a pitch-preserving MP3 decoder every physics tick can produce glitches.
+    // Updating a pitch-preserving audio decoder every physics tick can produce glitches.
     // Batch small rate changes to at most once per second without restarting playback.
     setSpeed(speed,dt=1){const extra=Math.max(0,speed-RUN_CONFIG.startSpeed);rate=1+.8*extra/(extra+400);rateElapsed+=dt;if(rateElapsed>=1){rateElapsed=0;if(track&&Math.abs(track.playbackRate-rate)>=.01)track.playbackRate=rate;}},
     reset(){if(track){track.pause();track.currentTime=0;track.playbackRate=1;}rate=1;rateElapsed=0;},
