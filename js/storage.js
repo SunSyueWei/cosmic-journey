@@ -11,7 +11,7 @@
   window.RunStore={
     get cloudEnabled(){return !!window.CloudScores?.enabled;},
     beginRun:async()=>window.CloudScores?.enabled&&RunStore.getProfile().cloudConsent?CloudScores.begin():null,
-    getAchievements:()=>Object.values(memory.achievements||{}),
+    getAchievements:()=>Object.values(memory.achievements||{}).sort((a,b)=>(b.id==='invitation')-(a.id==='invitation')),
     saveAchievement(record){memory.achievements||={};memory.achievements[record.id]=record;memory.achievement=record;save();},
     getAchievement:()=>memory.achievement||null,
     // Default to sharing only when no previous preference exists; preserve explicit opt-out.
@@ -39,5 +39,8 @@
   };
   // Preserve the previous 4,500 m trophy as a separately labelled legacy card.
   if(memory.achievement&&!memory.achievement.id){memory.achievements||={};memory.achievements.legacy={...memory.achievement,id:'legacy',title:'九星旅人 · 舊版紀念'};memory.achievement=memory.achievements.legacy;}
+  // Existing local completed runs also qualify; never treat a pre-gate run as unlocked.
+  const reached=(Array.isArray(memory.records)?memory.records:[]).find(r=>r.arrived===true);
+  if(reached&&!memory.achievements?.invitation){memory.achievements||={};memory.achievements.invitation={...reached,id:'invitation',planetIndex:null,title:'福音聚會邀請卡',time:reached.seconds||0};}
   save();
 })();

@@ -11,6 +11,8 @@
    if(state==='starting')return;RunAudio.unlock();RunAudio.music(false);
    if($('achievement').open)$('achievement').close();
    $('achievement-notice').getAnimations?.().forEach(animation=>animation.cancel());$('achievement-notice').textContent='';
+   $('arrival-banner').getAnimations?.().forEach(animation=>animation.cancel());
+   $('arrival-banner').textContent='';
    const name=RunStore.nickname($('nickname').value);$('nickname').value=name;RunStore.setProfile({name,cloudConsent:$('cloud-consent').checked});refreshPrivacy();reset();RunAudio.reset();RunAudio.music(true);state='starting';
    const button=$('start');button.disabled=true;const label=button.textContent;button.textContent='準備出發…';
    try{run.sessionId=await RunStore.beginRun();}catch(_){run.sessionId=null;run.cloudError=true;}
@@ -23,7 +25,7 @@
  function pause(){if(state!=='running')return;state='paused';RunAudio.music(false);panels('pause');$('resume').focus();}
  function resume(){if(state!=='paused')return;state='running';panels('');last=performance.now();accumulator=0;RunAudio.music(true);canvas.focus();}
  async function finish(){if(state!=='running')return;state='over';RunAudio.music(false);RunAudio.hit();$('pause').disabled=true;panels('end');updateHUD();const finishedRun=run;const score=Math.floor(run.score);$('final-score').textContent=score.toLocaleString();$('result-detail').textContent=`跑了 ${Math.floor(run.distance).toLocaleString()} m · 收集 ${run.cards} 張邀請卡`;$('end-badge').textContent=run.arrived?'成功抵達福音聚會！':'每一步都算數';$('end-title').textContent=run.arrived?'好消息，成功送達！':'再跳一下，就更遠！';$('best-score').textContent=Math.max(score,RunStore.getProfile().best).toLocaleString();$('rank-summary').textContent='正在記錄成績…';$('end-panel').querySelector('.restart').focus();const endCard=cardRecord(Math.min(9,run.nextCard-1));RunStore.saveAchievement(endCard);showAchievement(endCard);try{await RunStore.submit({name:RunStore.getProfile().name,score,distance:Math.floor(run.distance),cards:run.cards,arrived:run.arrived,sessionId:run.sessionId,seconds:run.time,exactDistance:run.distance,cardsBefore:run.cardsBefore});if(!RunStore.getProfile().cloudConsent){if(state==='over'&&run===finishedRun)$('rank-summary').textContent='本局僅存本機，未上傳排行榜。';return;}const rows=await RunStore.list('event');if(state==='over'&&run===finishedRun){const mine=rows.find(r=>r.mine);$('rank-summary').textContent=mine?`${RunStore.cloudEnabled?'共用':'本機'}活動排行第 ${mine.rank} 名 · 挑戰下一個紀錄！`:'已保存成績。';}}catch(_){if(run===finishedRun)$('rank-summary').textContent='成績已留在本機，但未能上傳共用排行。';}}
- function arrival(){run.arrived=true;run.score+=C.arrivalBonus;run.safe=3;run.obstacles=[];run.spawn=3.5;toast('成功抵達福音聚會！\n宇宙浩瀚，但你從不孤單。\n+2,000 分 · 積分 ×1.5',3.5);RunAudio.cheer();for(let i=0;i<75;i++)run.particles.push({x:Math.random()*width,y:Math.random()*180,vx:(Math.random()-.5)*130,vy:40+Math.random()*100,color:['#9dc9ff','#fff0ca','#b7a3e0','#f2c7ab'][i%4],life:3.5});}
+ function arrival(){run.arrived=true;RunStore.saveAchievement({...cardRecord(0),id:'invitation',planetIndex:null,title:'福音聚會邀請卡'});const banner=$('arrival-banner');banner.textContent='福音聚會，我來了！';banner.getAnimations?.().forEach(a=>a.cancel());banner.animate?.([{opacity:0},{opacity:1,offset:.12},{opacity:1,offset:.75},{opacity:0}],{duration:3600,fill:'forwards'});run.score+=C.arrivalBonus;run.safe=3;run.obstacles=[];run.spawn=3.5;toast('成功抵達福音聚會！\n宇宙浩瀚，但你從不孤單。\n+2,000 分 · 積分 ×1.5',3.5);RunAudio.cheer();for(let i=0;i<75;i++)run.particles.push({x:Math.random()*width,y:Math.random()*180,vx:(Math.random()-.5)*130,vy:40+Math.random()*100,color:['#9dc9ff','#fff0ca','#b7a3e0','#f2c7ab'][i%4],life:3.5});}
  function updateHUD(){const planet=SpaceScene.planets[SpaceScene.phase(run.distance).index];$('planet-name').textContent=planet.name+' · '+planet.land;$('planet-en').textContent=planet.en;$('velocity').textContent=(run.speed/C.startSpeed).toFixed(2)+'×';$('score').textContent=Math.floor(run.score).toString().padStart(5,'0');$('distance').textContent=Math.floor(run.distance).toLocaleString();$('cards').textContent=run.cards;$('remaining').textContent=run.arrived?'無限挑戰 · 積分 ×1.5':`還有 ${Math.max(0,Math.ceil(C.venueDistance-run.distance)).toLocaleString()} m`;$('route-label').textContent=run.arrived?'已抵達聚會 · 繼續探索星海':'目的地：福音聚會';$('progress').style.width=`${Math.min(100,run.distance/C.venueDistance*100)}%`;}
  // Fixed 120 Hz simulation avoids frame-rate dependent jumps and tunnelling.
  function step(dt){
@@ -63,9 +65,16 @@
  function cardRecord(index){return {id:index<9?'planet-'+index:'grand',planetIndex:index<9?index:null,title:index<9?SpaceScene.planets[index].name+'探索者':'九星旅人',name:RunStore.getProfile().name,distance:Math.floor(run.distance),score:Math.floor(run.score),cards:run.cards,time:run.time,date:new Date().toISOString()};}
  function savePlanetCard(index){const record=cardRecord(index);RunStore.saveAchievement(record);$('last-achievement').hidden=false;return record;}
  function showAchievement(record){
-   selectedCard=record;AchievementCard.draw($('achievement-card'),record);
+   selectedCard=record;$('save-achievement').disabled=false;
+   if(record.id==='invitation'){
+    $('save-achievement').disabled=true;
+    const buffer=document.createElement('canvas');buffer.width=900;buffer.height=1100;
+    $('achievement-card').getContext('2d').clearRect(0,0,900,1100);
+    AchievementCard.drawInvitation(buffer,record).then(()=>{if(selectedCard!==record)return;$('achievement-card').getContext('2d').drawImage(buffer,0,0);$('save-achievement').disabled=false;}).catch(()=>{if(selectedCard===record)$('achievement-status').textContent='邀請卡載入失敗，請切換卡片重試。';});
+   }else AchievementCard.draw($('achievement-card'),record);
    $('achievement-title').textContent=record.title||'九星旅人';
    $('achievement-caption').textContent=record.planetIndex!=null?'新的世界，新的足跡。你的星球收藏又多了一張。':'你穿越了整片星海。這一刻，值得被記住。';
+   if(record.id==='invitation')$('achievement-caption').textContent='生命探索成就達成！來到現場，出示這張邀請卡即可兌換精美小禮，請洽現場同工。';
    $('achievement-card').setAttribute('aria-label',`${record.name}，${record.title}，${record.distance} 公尺，${record.score} 分`);
    $('achievement-status').textContent='下載成就卡，或直接截圖分享給朋友。';
    $('continue-achievement').textContent=state==='achievement'?'繼續探索 →':'關閉收藏冊';
@@ -82,7 +91,7 @@
  $('save-achievement').onclick=()=>{try{AchievementCard.download($('achievement-card'),selectedCard);$('achievement-status').textContent='已準備 PNG 下載；也可以直接截圖保留。';}catch(_){$('achievement-status').textContent='此瀏覽器未能下載，請直接截圖保存成就卡。';}};
  $('continue-achievement').onclick=()=>$('achievement').close();
  $('achievement').addEventListener('close',()=>{if(state==='achievement'){state='paused';if(document.hidden){panels('pause');}else resume();}});
- $('last-achievement').onclick=()=>{pause();const record=RunStore.getAchievement();if(record)showAchievement(record);};
+ $('last-achievement').onclick=()=>{pause();const record=RunStore.getAchievements().find(c=>c.id==='invitation')||RunStore.getAchievement();if(record)showAchievement(record);};
  $('last-achievement').hidden=!RunStore.getAchievement();
  function round(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
  function ellipse(x,y,rx,ry,color){ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fill();}
@@ -182,6 +191,7 @@
  // Explicit opt-in diagnostic surface, absent in normal play.
  if(new URLSearchParams(location.search).has('test'))window.RunTest={frame,start,jump,step,finish,pause,resume,get state(){return state;},get run(){return run;},get player(){return player;},render:()=>{updateHUD();draw();}};
  if(new URLSearchParams(location.search).has('test')){
+   const gate=document.createElement('button');gate.className='outline';gate.textContent='測試：通過聚會大門';gate.onclick=async()=>{await start();run.distance=C.venueDistance-.01;run.previousDistance=run.distance;step(1/120);};$('last-achievement').after(gate);
    const preview=document.createElement('button');preview.className='outline';preview.textContent='測試：九星成就流程';
    preview.onclick=async()=>{await start();run.nextCard=9;run.distance=C.planetDistance*9-.01;run.previousDistance=run.distance;run.arrived=true;run.score=9200;run.time=95;run.cards=12;step(1/120);};
    $('last-achievement').after(preview);

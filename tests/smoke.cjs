@@ -13,6 +13,8 @@ function boot(){
  for(let kind=0;kind<3;kind++){await t.start();t.run.obstacles=[{x:t.player.x,w:64,h:kind===1?8:40,kind,rotation:0}];t.step(1/120);assert.equal(t.state,'over',`collision ${kind}`);await Promise.resolve();}
  await t.start();t.run.distance=999.99;t.run.score=999.99;t.step(1/120);assert(t.run.arrived);assert.equal(t.state,'running');el('achievement').close();assert(t.run.score>=3000);assert(t.run.particles.length>0);assert.equal(t.run.obstacles.length,0);
  const score=t.run.score,distance=t.run.distance;t.step(1/120);assert(Math.abs((t.run.score-score)/(t.run.distance-distance)-1.5)<1e-6);
+ assert.equal(box.RunStore.getAchievements()[0].id,'invitation','gate invitation is first in album');
+ assert.equal(box.RunStore.getAchievements().filter(c=>c.id==='invitation').length,1);
  t.run.distance=1499.99;const old=t.run.score;t.step(1/120);assert(t.run.score-old>=500);t.render();assert(el('remaining').textContent.includes('1.5'));
  await t.finish();assert.equal(el('achievement').open,true);assert.equal(t.state,'over');el('achievement').close();const best=box.RunStore.getProfile().best;assert(best>3000);const rows=await box.RunStore.list();assert(rows.some(r=>r.mine));assert.equal(rows.filter(r=>r.demo).length,3);
  assert.equal(Array.from(box.RunStore.nickname('一二三四五六七八九十一二')).length,10);

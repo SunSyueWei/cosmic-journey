@@ -1,5 +1,15 @@
 /* A self-contained local PNG: no upload, account or external image required. */
 window.AchievementCard={
+ invitationImage:null,
+ async drawInvitation(canvas,record){
+  if(!this.invitationImage)this.invitationImage=new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>{this.invitationImage=null;reject(new Error('邀請卡載入失敗'));};image.src='assets/invitation.png';});
+  const image=await this.invitationImage,c=canvas.getContext('2d');
+  c.fillStyle='#081529';c.fillRect(0,0,900,1100);c.drawImage(image,25,25,850,850);
+  c.textAlign='center';c.fillStyle='#f3d5ae';c.font='bold 34px sans-serif';c.fillText('生命探索成就達成！',450,925,830);
+  c.fillStyle='#e9eff8';c.font='25px sans-serif';c.fillText(record.name+' · 福音聚會，我來了！',450,970,830);
+  c.font='24px sans-serif';c.fillText('來到聚會現場，出示這張圖可兌換精美小禮。',450,1018,830);
+  c.font='18px sans-serif';c.fillStyle='#b1c3da';c.fillText('兌換請洽現場同工 · 本圖非一次性核銷憑證',450,1060,830);
+ },
  draw(canvas,record){
   if(record.planetIndex!=null){this.drawPlanet(canvas,record);return;}
   const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
@@ -15,7 +25,7 @@ window.AchievementCard={
   label(`${record.distance.toLocaleString()} m`,747,64,'#f6dfb9');
   label(`積分 ${record.score.toLocaleString()}  ·  邀請卡 ${record.cards} 張`,800,27);
   label(`09 / 09 星球完成  ·  ${Math.floor(record.time/60)} 分 ${Math.floor(record.time%60)} 秒`,849,22,'#b8cce7');
-  label('宇宙的奧秘與人生的意義',937,27);label('宇宙浩瀚，但你從不孤單。',980,21,'#d5b98f');label('台中青少年福音聚會 · '+new Date(record.date).toLocaleDateString('zh-TW'),1034,17,'#9bb4d1');
+  label('宇宙的奧祕與人生的意義',937,27);label('宇宙浩瀚，但你從不孤單。',980,21,'#d5b98f');label('台中青少年福音聚會 · '+new Date(record.date).toLocaleDateString('zh-TW'),1034,17,'#9bb4d1');
  },
  drawPlanet(canvas,record){
   const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height,index=record.planetIndex,p=SpaceScene.planets[index];
@@ -34,7 +44,7 @@ window.AchievementCard={
   label(p.name+'探索者',588,58);label(p.land+' · '+(index===0?'啟航紀念':'抵達紀念'),637,25,p.color);
   label(record.name,712,34);label(mottos[index],765,22,p.color);
   label(`${record.distance.toLocaleString()} m  ·  ${record.score.toLocaleString()} 分`,843,34);label(`邀請卡 ${record.cards} 張  ·  ${Math.floor(record.time/60)} 分 ${Math.floor(record.time%60)} 秒`,892,22);
-  label('宇宙的奧秘與人生的意義',974,25);label('台中青少年福音聚會 · '+new Date(record.date).toLocaleDateString('zh-TW'),1027,18,p.color);
+  label('宇宙的奧祕與人生的意義',974,25);label('台中青少年福音聚會 · '+new Date(record.date).toLocaleDateString('zh-TW'),1027,18,p.color);
  },
  download(canvas,record){const link=document.createElement('a');link.download=(record?.title||'九星旅人')+'-成就卡.png';link.href=canvas.toDataURL('image/png');link.click();}
 };
