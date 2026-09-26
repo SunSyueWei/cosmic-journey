@@ -4,11 +4,14 @@
   try { memory=JSON.parse(localStorage.getItem(key)||'{}')||{}; } catch (_) {}
   if(typeof memory!=='object'||Array.isArray(memory)) memory={};
   const save=()=>{try{localStorage.setItem(key,JSON.stringify(memory));}catch(_){}};
-  const day=(date)=>{const d=new Date(date);return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;};
+  const day=date=>new Date(new Date(date).getTime()+8*3600000).toISOString().slice(0,10);
+  // Taiwan has UTC+8 throughout the year. Monday 00:00 starts a new week.
+  const weekKey=(date=Date.now())=>{const d=new Date(new Date(date).getTime()+8*3600000);d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return d.toISOString().slice(0,10);};
   const nickname=value=>Array.from(String(value||'跳跳羊').trim()||'跳跳羊').slice(0,10).join('');
   const id=memory.playerId||(memory.playerId='p-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
   // Replace this async adapter for a shared backend; demo records never masquerade as real players.
   window.RunStore={
+    weekKey,
     get cloudEnabled(){return !!window.CloudScores?.enabled;},
     beginRun:async()=>window.CloudScores?.enabled&&RunStore.getProfile().cloudConsent?CloudScores.begin():null,
     getAchievements:()=>Object.values(memory.achievements||{}).sort((a,b)=>(b.id==='invitation')-(a.id==='invitation')),
@@ -29,10 +32,10 @@
       if(!window.CloudScores?.enabled)return 0;
       return CloudScores.deleteMine();
     },
-    async list(period='event'){
+    async list(period='week'){
       if(window.CloudScores?.enabled)return CloudScores.list(period);
       const demos=[['薄荷小羊',7280,2520],['小橘子',5940,2080],['喜樂跑跑',3860,1120]].map(([name,score,distance],i)=>({name,score,distance,playerId:'demo-'+i,demo:true,date:new Date().toISOString(),eventId:RUN_CONFIG.eventId}));
-      const rows=[...demos,...(Array.isArray(memory.records)?memory.records:[])].filter(r=>r.eventId===RUN_CONFIG.eventId&&(period!=='today'||day(r.date)===day(Date.now())));
+      const rows=[...demos,...(Array.isArray(memory.records)?memory.records:[])].filter(r=>r.eventId===RUN_CONFIG.eventId&&weekKey(r.date)===weekKey()&&(period!=='today'||day(r.date)===day(Date.now())));
       rows.sort((a,b)=>b.score-a.score||b.distance-a.distance||new Date(a.date)-new Date(b.date));
       const seen=new Set();return rows.filter(r=>{if(seen.has(r.playerId))return false;seen.add(r.playerId);return true;}).map((r,i)=>({...r,rank:i+1,mine:r.playerId===id}));
     }
